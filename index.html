@@ -998,49 +998,62 @@
         function renderFinanceTypeGrouping(district, schools, container) {
             container.innerHTML = '';
 
-            // Group schools by finance type (資助種類)
+            // Group schools by finance type AND religion/session/gender
             const groupedByFinanceType = {};
+
             schools.forEach(school => {
                 const financeType = school.properties.資助種類 || '其他';
-                if (!groupedByFinanceType[financeType]) {
-                    groupedByFinanceType[financeType] = [];
+                const religion = school.properties.宗教 || '';
+                const session = school.properties.學校授課時間 || '';
+                const gender = school.properties.就讀學生性別 || '';
+
+                // Create a unique key combining finance type AND religion/session/gender
+                const groupKey = `${financeType}|${religion}|${session}|${gender}`;
+
+                if (!groupedByFinanceType[groupKey]) {
+                    groupedByFinanceType[groupKey] = {
+                        financeType: financeType,
+                        religion: religion,
+                        session: session,
+                        gender: gender,
+                        schools: []
+                    };
                 }
-                groupedByFinanceType[financeType].push(school);
+                groupedByFinanceType[groupKey].schools.push(school);
             });
 
-            // Sort finance types
-            const sortedFinanceTypes = Object.keys(groupedByFinanceType).sort();
+            // Sort groups by finance type
+            const sortedGroups = Object.values(groupedByFinanceType).sort((a, b) => {
+                return a.financeType.localeCompare(b.financeType) ||
+                    a.religion.localeCompare(b.religion) ||
+                    a.session.localeCompare(b.session) ||
+                    a.gender.localeCompare(b.gender);
+            });
 
-            sortedFinanceTypes.forEach(financeType => {
-                const typeSchools = groupedByFinanceType[financeType];
+            sortedGroups.forEach(group => {
+                const typeSchools = group.schools;
+
+                // Create finance type label with additional info
+                let financeLabel = group.financeType;
+                const extraInfo = [group.religion, group.session, group.gender].filter(Boolean);
+                if (extraInfo.length > 0) {
+                    financeLabel += ` (${extraInfo.join(' / ')})`;
+                }
 
                 // Create finance type accordion
                 const financeAccordion = document.createElement('div');
                 financeAccordion.className = 'finance-accordion';
-                
-                // Create finance type label with additional info
-                let financeLabel = financeType;
-                if (typeSchools.length > 0) {
-                    const sampleSchool = typeSchools[0];
-                    const religion = sampleSchool.properties.宗教 || '';
-                    const session = sampleSchool.properties.學校授課時間 || '';
-                    const gender = sampleSchool.properties.就讀學生性別 || '';
-                    
-                    if (religion || session || gender) {
-                        financeLabel += ` (${[religion, session, gender].filter(Boolean).join(' / ')})`;
-                    }
-                }
-                
+
                 financeAccordion.innerHTML = `
-                    <div class="finance-header">
-                        <span>
-                            ${financeLabel}
-                            <span class="finance-counter">${typeSchools.length}</span>
-                        </span>
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
-                    <div class="finance-content"></div>
-                `;
+            <div class="finance-header">
+                <span>
+                    ${financeLabel}
+                    <span class="finance-counter">${typeSchools.length}</span>
+                </span>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="finance-content"></div>
+        `;
 
                 container.appendChild(financeAccordion);
 
@@ -1123,7 +1136,7 @@
             document.querySelectorAll('.facility-item').forEach(item => {
                 item.addEventListener('click', function (e) {
                     e.stopPropagation();
-                    
+
                     // Remove active class from all school items
                     document.querySelectorAll('.facility-item').forEach(i => {
                         i.classList.remove('active');
